@@ -29,7 +29,19 @@ module neptuno2_top (
 	output  [1:0] SDRAM_BA,
 	output        SDRAM_CLK,
 	output        SDRAM_CKE,
-
+`ifdef DUAL_SDRAM	
+	output [12:0] SDRAM2_A,
+	inout  [15:0] SDRAM2_DQ,
+	output        SDRAM2_DQML,
+	output        SDRAM2_DQMH,
+	output        SDRAM2_nWE,
+	output        SDRAM2_nCAS,
+	output        SDRAM2_nRAS,
+	output        SDRAM2_nCS,
+	output  [1:0] SDRAM2_BA,
+	output        SDRAM2_CLK,
+	output        SDRAM2_CKE,	
+`endif	
 	output        AUDIO_L,
 	output        AUDIO_R,
 
@@ -37,10 +49,16 @@ module neptuno2_top (
 	output        I2S_LRCK,
 	output        I2S_DATA,
 
-//   output        JOY_CLK       = 1'b1,
-//	output        JOY_LOAD      = 1'b1,
-//	input         JOY_DATA,
-//	output        JOY_SEL       = 1'b1,	
+	//joystick reflection
+	input        JOY_XCLK,
+	input		 JOY_XLOAD,
+	output       JOY_XDATA,	
+
+	// db9 joystick
+	output        JOY_CLK       = 1'b1,
+	output        JOY_LOAD      = 1'b1,
+	input         JOY_DATA,
+	output        JOY_SELECT    = 1'b1,	
 	
 `ifdef USE_AUDIO_IN
 	input         AUDIO_IN,
@@ -67,6 +85,21 @@ NeoGeo_MiST guest
  .SDRAM_BA	 (SDRAM_BA),
  .SDRAM_CLK	 (SDRAM_CLK),
  .SDRAM_CKE	 (SDRAM_CKE),
+
+`ifdef DUAL_SDRAM	
+ .SDRAM2_DQ	 (SDRAM2_DQ),	
+ .SDRAM2_A	 (SDRAM2_A),
+ .SDRAM2_DQML (SDRAM2_DQML),
+ .SDRAM2_DQMH (SDRAM2_DQMH),
+ .SDRAM2_nWE  (SDRAM2_nWE),
+ .SDRAM2_nCAS (SDRAM2_nCAS),
+ .SDRAM2_nRAS (SDRAM2_nRAS),
+ .SDRAM2_nCS  (SDRAM2_nCS),
+ .SDRAM2_BA	  (SDRAM2_BA),
+ //.SDRAM2_CLK  (SDRAM2_CLK),
+ .SDRAM2_CLK  (ram2clk), 
+ .SDRAM2_CKE  (SDRAM2_CKE), 
+`endif
 		 			
  .SPI_DO	 (spi_do_int),
  .SPI_DI	 (SPI_DI),
@@ -95,9 +128,29 @@ NeoGeo_MiST guest
  .UART_TX	 (UART_TX) 
 );
 
+`ifdef DUAL_SDRAM
+wire ram2clk;
+wire pll_locked;
 
+pll2_mist pll3(
+	.inclk0(ram2clk),
+	.c0(SDRAM2_CLK),
+	.locked(pll_locked)
+);
+`endif
 
+// JAMMA interface
+reg joy_select = 1'b1;
+always @(posedge JOY_XLOAD) begin
+	joy_select <= ~joy_select | ~JOY_XCLK;
+end
 
+assign JOY_CLK = JOY_XCLK;
+assign JOY_LOAD = JOY_XLOAD;
+assign JOY_XDATA = JOY_DATA;
+assign JOY_SELECT = joy_select;
+
+// direct upload fix
 wire spi_do_int;
 assign spi_do_int = SPI_SS4 ? 1'bz : SD_MISO;
 assign SPI_DO = spi_do_int;
